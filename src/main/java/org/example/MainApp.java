@@ -578,12 +578,12 @@ public class MainApp extends Application {
                 task.comment = parts[5];
                 task.changeReason = parts[6];
 
-                if (!parts[7].equals("null")) {
-                    task.lastCompletedDate =
-                            LocalDate.parse(parts[7]);
-                }
+                task.preferredDay = Integer.parseInt(parts[7]);
 
-                task.preferredDay = Integer.parseInt(parts[8]);
+                if (!parts[8].equals("null")) {
+                    task.lastCompletedDate =
+                            LocalDate.parse(parts[8]);
+                }
 
                 tasks.add(task);
             }
