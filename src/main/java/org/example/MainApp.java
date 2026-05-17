@@ -264,7 +264,11 @@ public class MainApp extends Application {
                         case "Ежемесячно":
 
                             while (task.deadline.isBefore(virtualToday)) {
-                                task.deadline = task.deadline.plusMonths(1);
+                                task.deadline =
+                                        moveMonthlyDeadline(
+                                                task.deadline,
+                                                task.preferredDay
+                                        );
                             }
 
                             break;
@@ -523,6 +527,7 @@ public class MainApp extends Application {
                                 t.completed + ";;" +
                                 t.comment + ";;" +
                                 t.changeReason + ";;" +
+                                t.preferredDay + ";;" +
                                 (t.lastCompletedDate == null
                                         ? "null"
                                         : t.lastCompletedDate)
@@ -558,7 +563,7 @@ public class MainApp extends Application {
 
                 String[] parts = line.split(";;");
 
-                if (parts.length < 8) continue;
+                if (parts.length < 9) continue;
 
                 TaskItem task = new TaskItem(
                         parts[0],
@@ -577,6 +582,8 @@ public class MainApp extends Application {
                     task.lastCompletedDate =
                             LocalDate.parse(parts[7]);
                 }
+
+                task.preferredDay = Integer.parseInt(parts[8]);
 
                 tasks.add(task);
             }
@@ -658,6 +665,8 @@ public class MainApp extends Application {
 
         LocalDate lastCompletedDate = null;
 
+        int preferredDay;
+
         TaskItem(String title,
                  String description,
                  LocalDate deadline,
@@ -667,7 +676,19 @@ public class MainApp extends Application {
             this.description = description;
             this.deadline = deadline;
             this.repeatType = repeatType;
+            this.preferredDay = deadline.getDayOfMonth();
         }
+    }
+
+    private LocalDate moveMonthlyDeadline(LocalDate current, int preferredDay) {
+
+        LocalDate nextMonth = current.plusMonths(1);
+
+        int maxDay = nextMonth.lengthOfMonth();
+
+        int targetDay = Math.min(preferredDay, maxDay);
+
+        return nextMonth.withDayOfMonth(targetDay);
     }
 
     public static void main(String[] args) {
