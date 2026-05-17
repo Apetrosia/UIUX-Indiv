@@ -5,7 +5,6 @@ import javafx.collections.FXCollections;
 import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.TextFormatter;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -15,7 +14,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.UnaryOperator;
 
 public class MainApp extends Application {
 
@@ -27,7 +25,6 @@ public class MainApp extends Application {
     private final DateTimeFormatter formatter =
             DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
-    // ===== ЧИТ ДЛЯ ДЕМОНСТРАЦИИ =====
     private LocalDate virtualToday = LocalDate.now();
 
     @Override
@@ -35,13 +32,10 @@ public class MainApp extends Application {
 
         BorderPane root = new BorderPane();
 
-        // ===== LEFT MENU =====
-
         VBox menu = new VBox(12);
         menu.setPadding(new Insets(15));
         menu.setPrefWidth(280);
         menu.setAlignment(Pos.TOP_CENTER);
-
         menu.setStyle("-fx-background-color: linear-gradient(to bottom, #2c3e50, #34495e);");
 
         Label title = new Label("Список задач");
@@ -54,38 +48,17 @@ public class MainApp extends Application {
         descField.setPromptText("Описание");
         descField.setPrefRowCount(4);
 
-        // ===== DATE FIELD =====
-
+        // ===== DATE PICKER =====
         DatePicker datePicker = new DatePicker();
-        datePicker.setPromptText("Выберите дату");
+        datePicker.setValue(virtualToday);
+        datePicker.setPromptText("Дата");
 
-        // нельзя выбирать прошлое
+        // запрет прошлых дат
         datePicker.setDayCellFactory(picker -> new DateCell() {
             @Override
             public void updateItem(LocalDate date, boolean empty) {
                 super.updateItem(date, empty);
-
                 setDisable(empty || date.isBefore(virtualToday));
-                if (date.isBefore(virtualToday)) {
-                    setStyle("-fx-background-color: #eeeeee;");
-                }
-            }
-        });
-
-        // стартовое ограничение
-        datePicker.setValue(virtualToday);
-
-        // кнопка календаря (по факту просто фокус на пикер)
-        Button calendarBtn = new Button("📅");
-        calendarBtn.setOnAction(e -> datePicker.show());
-
-        // отображение в текстовом виде (read-only логика)
-        TextField dateDisplay = new TextField();
-        dateDisplay.setEditable(false);
-
-        datePicker.valueProperty().addListener((obs, oldV, newV) -> {
-            if (newV != null) {
-                dateDisplay.setText(newV.format(formatter));
             }
         });
 
@@ -97,14 +70,11 @@ public class MainApp extends Application {
                         "Ежемесячно"
                 )
         );
-
         repeatBox.setValue("Разовая");
 
         Button addBtn = createButton("Добавить задачу");
         Button saveBtn = createButton("Сохранить");
         Button loadBtn = createButton("Загрузить");
-
-        // ===== ЧИТ-КНОПКА =====
 
         Button nextDayBtn = createButton("+ день");
 
@@ -115,57 +85,51 @@ public class MainApp extends Application {
         currentDateLabel.setStyle("-fx-text-fill: white;-fx-font-size: 14px;");
 
         nextDayBtn.setOnAction(e -> {
-
             virtualToday = virtualToday.plusDays(1);
-
-            currentDateLabel.setText(
-                    "Сегодня: " + virtualToday.format(formatter)
-            );
-
+            currentDateLabel.setText("Сегодня: " + virtualToday.format(formatter));
             updateTasksForNewDay();
         });
 
         menu.getChildren().addAll(
                 title,
-
                 currentDateLabel,
                 nextDayBtn,
-
                 new LabelStyled("Название"),
                 nameField,
-
                 new LabelStyled("Описание"),
                 descField,
-
                 new LabelStyled("Срок"),
                 datePicker,
-
                 new LabelStyled("Повтор"),
                 repeatBox,
-
                 addBtn,
                 saveBtn,
                 loadBtn
         );
 
-        // ===== CENTER =====
-
         ScrollPane scroll = new ScrollPane(tasksContainer);
         scroll.setFitToWidth(true);
-
-        tasksContainer.setPadding(new Insets(15));
-        tasksContainer.setStyle("-fx-background-color: #ecf0f1;");
 
         root.setLeft(menu);
         root.setCenter(scroll);
 
-        // ===== ACTIONS =====
-
+        // ===== ADD TASK =====
         addBtn.setOnAction(e -> {
 
             String name = nameField.getText().trim();
             String desc = descField.getText().trim();
             LocalDate date = datePicker.getValue();
+
+            // ===== VALIDATION =====
+            if (name.isEmpty() || desc.isEmpty() || date == null) {
+                showAlert("Ошибка", "Заполните название, описание и дату");
+                return;
+            }
+
+            if (date.isBefore(virtualToday)) {
+                showAlert("Ошибка", "Дата не может быть раньше сегодняшней");
+                return;
+            }
 
             TaskItem task = new TaskItem(
                     name,
@@ -175,13 +139,11 @@ public class MainApp extends Application {
             );
 
             tasks.add(task);
-
             addTaskCard(task);
 
             nameField.clear();
             descField.clear();
-            dateDisplay.clear();
-
+            datePicker.setValue(virtualToday);
             repeatBox.setValue("Разовая");
         });
 
@@ -196,83 +158,17 @@ public class MainApp extends Application {
         loadTasks();
 
         Scene scene = new Scene(root, 1050, 700);
-
-        primaryStage.setTitle("Список задач");
         primaryStage.setScene(scene);
+        primaryStage.setTitle("Список задач");
         primaryStage.show();
     }
 
-    // ===== ОБНОВЛЕНИЕ НОВОГО ДНЯ =====
-
-    private void updateTasksForNewDay() {
-
-        for (TaskItem task : tasks) {
-
-            if (!task.repeatType.equals("Разовая")) {
-
-                if (task.completed &&
-                        virtualToday.isAfter(task.deadline)) {
-
-                    // сбрасываем выполненность
-                    task.completed = false;
-
-                    // двигаем дедлайн вперед
-                    switch (task.repeatType) {
-
-                        case "Ежедневно":
-
-                            while (task.deadline.isBefore(virtualToday)) {
-                                task.deadline = task.deadline.plusDays(1);
-                            }
-
-                            break;
-
-                        case "Еженедельно":
-
-                            while (task.deadline.isBefore(virtualToday)) {
-                                task.deadline = task.deadline.plusWeeks(1);
-                            }
-
-                            break;
-
-                        case "Ежемесячно":
-
-                            while (task.deadline.isBefore(virtualToday)) {
-                                task.deadline =
-                                        moveMonthlyDeadline(
-                                                task.deadline,
-                                                task.preferredDay
-                                        );
-                            }
-
-                            break;
-                    }
-                }
-            }
-        }
-
-        redrawTasks();
-    }
-
-    // ===== ПЕРЕРИСОВКА =====
-
-    private void redrawTasks() {
-
-        tasksContainer.getChildren().clear();
-
-        for (TaskItem task : tasks) {
-            addTaskCard(task);
-        }
-    }
-
     // ===== TASK CARD =====
-
     private void addTaskCard(TaskItem task) {
 
         VBox card = new VBox(8);
         card.setPadding(new Insets(12));
-
-        card.setStyle("-fx-background-color: white;-fx-background-radius: 12;-fx-border-radius: 12;-fx-border-color: #dcdde1;");
+        card.setStyle("-fx-background-color: white;-fx-background-radius: 12;");
 
         Label name = new Label(task.title);
         name.setStyle("-fx-font-size: 18px;-fx-font-weight: bold;");
@@ -280,389 +176,116 @@ public class MainApp extends Application {
         Label desc = new Label(task.description);
         desc.setWrapText(true);
 
-        Label deadline = new Label(
-                "Срок: " + task.deadline.format(formatter)
-        );
+        Label deadline = new Label("Срок: " + task.deadline.format(formatter));
 
-        Label repeat = new Label(
-                "Тип: " + task.repeatType
-        );
+        Label status = new Label(task.completed ? "выполнено" : "не выполнено");
+        status.setTextFill(task.completed ? Color.GREEN : Color.RED);
 
-        Label status = new Label(
-                task.completed
-                        ? "Статус: выполнено"
-                        : "Статус: не выполнено"
-        );
-
-        if (task.completed) {
-            status.setTextFill(Color.GREEN);
-        } else {
-            status.setTextFill(Color.DARKRED);
-        }
-
-        Label lastCompletedLabel = new Label();
-
-        if (task.lastCompletedDate != null) {
-
-            lastCompletedLabel.setText(
-                    "Последнее выполнение: "
-                            + task.lastCompletedDate.format(formatter)
-            );
-
-            lastCompletedLabel.setStyle(
-                    "-fx-text-fill: #2980b9;"
-            );
-        }
-
-        Button doneBtn = createSmallButton("Выполнено");
-        Button editDeadlineBtn = createSmallButton("Изменить срок");
+        Button doneBtn = createSmallButton("Готово");
         Button deleteBtn = createSmallButton("Удалить");
 
-        HBox controls = new HBox(10,
-                doneBtn,
-                editDeadlineBtn,
-                deleteBtn
-        );
-
-        controls.setAlignment(Pos.CENTER_LEFT);
-
-        // ===== COMPLETE =====
-
         doneBtn.setOnAction(e -> {
-
-            if (task.completed) {
-
-                showAlert(
-                        "Информация",
-                        "Задача уже выполнена сегодня."
-                );
-
-                return;
-            }
-
-            if (virtualToday.isAfter(task.deadline)) {
-
-                TextInputDialog dialog = new TextInputDialog();
-
-                dialog.setTitle("Комментарий");
-
-                dialog.setHeaderText(
-                        "Задача выполнена не в срок"
-                );
-
-                dialog.setContentText("Введите причину:");
-
-                dialog.showAndWait().ifPresent(comment -> {
-                    task.comment = comment;
-                });
-            }
-
             task.completed = true;
-            task.lastCompletedDate = virtualToday;
-
-            // ===== ЦИКЛИЧЕСКИЕ ЗАДАЧИ =====
-
             redrawTasks();
         });
-
-        // ===== CHANGE DEADLINE =====
-
-        editDeadlineBtn.setOnAction(e -> {
-
-            Dialog<LocalDate> dialog = new Dialog<>();
-            dialog.setTitle("Изменение срока");
-
-            TextField newDateField = new TextField(
-                    task.deadline.format(formatter)
-            );
-
-            TextArea reasonArea = new TextArea();
-            reasonArea.setPromptText("Причина изменения срока");
-
-            VBox content = new VBox(10,
-                    new Label("Новый срок"),
-                    newDateField,
-                    new Label("Причина"),
-                    reasonArea
-            );
-
-            dialog.getDialogPane().setContent(content);
-
-            ButtonType ok =
-                    new ButtonType("Сохранить",
-                            ButtonBar.ButtonData.OK_DONE);
-
-            dialog.getDialogPane().getButtonTypes().addAll(
-                    ok,
-                    ButtonType.CANCEL
-            );
-
-            dialog.setResultConverter(btn -> {
-
-                if (btn == ok) {
-
-                    try {
-                        return LocalDate.parse(
-                                newDateField.getText(),
-                                formatter
-                        );
-                    } catch (Exception ex) {
-                        return null;
-                    }
-                }
-
-                return null;
-            });
-
-            dialog.showAndWait().ifPresent(newDate -> {
-
-                if (reasonArea.getText().trim().isEmpty()) {
-
-                    showAlert(
-                            "Ошибка",
-                            "Нужно указать причину изменения срока."
-                    );
-
-                    return;
-                }
-
-                task.deadline = newDate;
-                task.changeReason = reasonArea.getText();
-
-                redrawTasks();
-            });
-        });
-
-        // ===== DELETE =====
 
         deleteBtn.setOnAction(e -> {
-
             tasks.remove(task);
-
             redrawTasks();
         });
 
-        card.getChildren().addAll(
-                name,
-                desc,
-                deadline,
-                repeat,
-                status
-        );
-
-        if (!lastCompletedLabel.getText().isEmpty()) {
-            card.getChildren().add(lastCompletedLabel);
-        }
-
-        if (!task.comment.isEmpty()) {
-
-            Label commentLabel =
-                    new Label("Комментарий: " + task.comment);
-
-            commentLabel.setStyle(
-                    "-fx-text-fill: #7f8c8d;-fx-font-style: italic;"
-            );
-
-            card.getChildren().add(commentLabel);
-        }
-
-        if (!task.changeReason.isEmpty()) {
-
-            Label reasonLabel =
-                    new Label("Причина переноса: "
-                            + task.changeReason);
-
-            reasonLabel.setStyle(
-                    "-fx-text-fill: #8e44ad;-fx-font-style: italic;"
-            );
-
-            card.getChildren().add(reasonLabel);
-        }
-
-        card.getChildren().add(controls);
+        card.getChildren().addAll(name, desc, deadline, status,
+                new HBox(10, doneBtn, deleteBtn));
 
         tasksContainer.getChildren().add(card);
     }
 
+    // ===== REFRESH =====
+    private void redrawTasks() {
+        tasksContainer.getChildren().clear();
+        for (TaskItem t : tasks) addTaskCard(t);
+    }
+
     // ===== SAVE =====
-
     private void saveTasks() {
-
-        try (PrintWriter writer =
-                     new PrintWriter(new FileWriter(saveFile))) {
-
+        try (PrintWriter w = new PrintWriter(new FileWriter(saveFile))) {
             for (TaskItem t : tasks) {
-
-                writer.println(
-                        t.title + ";;" +
-                                t.description + ";;" +
-                                t.deadline + ";;" +
-                                t.repeatType + ";;" +
-                                t.completed + ";;" +
-                                t.comment + ";;" +
-                                t.changeReason + ";;" +
-                                t.preferredDay + ";;" +
-                                (t.lastCompletedDate == null
-                                        ? "null"
-                                        : t.lastCompletedDate)
-                );
+                w.println(t.title + ";;" + t.description + ";;" + t.deadline + ";;" + t.repeatType);
             }
-
-            showAlert(
-                    "Успех",
-                    "Задачи сохранены в файл."
-            );
-
-        } catch (IOException e) {
-
-            showAlert(
-                    "Ошибка",
-                    "Не удалось сохранить файл."
-            );
+            showAlert("OK", "Сохранено");
+        } catch (Exception e) {
+            showAlert("Ошибка", "Не удалось сохранить");
         }
     }
 
     // ===== LOAD =====
-
     private void loadTasks() {
-
         if (!saveFile.exists()) return;
 
-        try (BufferedReader reader =
-                     new BufferedReader(new FileReader(saveFile))) {
-
+        try (BufferedReader r = new BufferedReader(new FileReader(saveFile))) {
             String line;
+            while ((line = r.readLine()) != null) {
 
-            while ((line = reader.readLine()) != null) {
+                String[] p = line.split(";;");
+                if (p.length < 4) continue;
 
-                String[] parts = line.split(";;");
-
-                if (parts.length < 9) continue;
-
-                TaskItem task = new TaskItem(
-                        parts[0],
-                        parts[1],
-                        LocalDate.parse(parts[2]),
-                        parts[3]
+                TaskItem t = new TaskItem(
+                        p[0],
+                        p[1],
+                        LocalDate.parse(p[2]),
+                        p[3]
                 );
 
-                task.completed =
-                        Boolean.parseBoolean(parts[4]);
-
-                task.comment = parts[5];
-                task.changeReason = parts[6];
-
-                task.preferredDay = Integer.parseInt(parts[7]);
-
-                if (!parts[8].equals("null")) {
-                    task.lastCompletedDate =
-                            LocalDate.parse(parts[8]);
-                }
-
-                tasks.add(task);
+                tasks.add(t);
             }
-
             redrawTasks();
 
-        } catch (IOException e) {
-
-            showAlert(
-                    "Ошибка",
-                    "Не удалось загрузить файл."
-            );
+        } catch (Exception e) {
+            showAlert("Ошибка", "Load failed");
         }
     }
 
-    // ===== BUTTONS =====
+    private void updateTasksForNewDay() {
+        redrawTasks();
+    }
 
-    private Button createButton(String text) {
-
-        Button b = new Button(text);
-
+    private Button createButton(String t) {
+        Button b = new Button(t);
         b.setPrefWidth(220);
-
-        b.setStyle("-fx-background-color: #ecf0f1;-fx-background-radius: 8;-fx-font-size: 14px;");
-
         return b;
     }
 
-    private Button createSmallButton(String text) {
-
-        Button b = new Button(text);
-
-        b.setStyle("-fx-background-color: #dfe6e9;-fx-background-radius: 8;");
-
-        return b;
+    private Button createSmallButton(String t) {
+        return new Button(t);
     }
 
-    // ===== ALERT =====
-
-    private void showAlert(String title, String text) {
-
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(text);
-
-        alert.showAndWait();
+    private void showAlert(String t, String m) {
+        Alert a = new Alert(Alert.AlertType.INFORMATION);
+        a.setTitle(t);
+        a.setContentText(m);
+        a.showAndWait();
     }
-
-    // ===== LABEL =====
 
     private static class LabelStyled extends Label {
-
-        LabelStyled(String text) {
-
-            super(text);
-
-            setStyle("-fx-text-fill: white;-fx-font-weight: bold;");
+        LabelStyled(String t) {
+            super(t);
+            setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
         }
     }
-
-    // ===== TASK MODEL =====
 
     private static class TaskItem {
-
         String title;
         String description;
-
         LocalDate deadline;
-
         String repeatType;
+        boolean completed;
 
-        boolean completed = false;
-
-        String comment = "";
-
-        String changeReason = "";
-
-        LocalDate lastCompletedDate = null;
-
-        int preferredDay;
-
-        TaskItem(String title,
-                 String description,
-                 LocalDate deadline,
-                 String repeatType) {
-
-            this.title = title;
-            this.description = description;
-            this.deadline = deadline;
-            this.repeatType = repeatType;
-            this.preferredDay = deadline.getDayOfMonth();
+        TaskItem(String t, String d, LocalDate dl, String r) {
+            title = t;
+            description = d;
+            deadline = dl;
+            repeatType = r;
         }
-    }
-
-    private LocalDate moveMonthlyDeadline(LocalDate current, int preferredDay) {
-
-        LocalDate nextMonth = current.plusMonths(1);
-
-        int maxDay = nextMonth.lengthOfMonth();
-
-        int targetDay = Math.min(preferredDay, maxDay);
-
-        return nextMonth.withDayOfMonth(targetDay);
     }
 
     public static void main(String[] args) {
