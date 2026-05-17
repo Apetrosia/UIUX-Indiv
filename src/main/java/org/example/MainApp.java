@@ -56,38 +56,36 @@ public class MainApp extends Application {
 
         // ===== DATE FIELD =====
 
-        TextField dateField = new TextField();
-        dateField.setPromptText("ДД.ММ.ГГГГ");
+        DatePicker datePicker = new DatePicker();
+        datePicker.setPromptText("Выберите дату");
 
-        UnaryOperator<TextFormatter.Change> filter = change -> {
+        // нельзя выбирать прошлое
+        datePicker.setDayCellFactory(picker -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate date, boolean empty) {
+                super.updateItem(date, empty);
 
-            String newText = change.getControlNewText();
-
-            // только цифры и точки
-            if (!newText.matches("[0-9.]*")) {
-                return null;
+                setDisable(empty || date.isBefore(virtualToday));
+                if (date.isBefore(virtualToday)) {
+                    setStyle("-fx-background-color: #eeeeee;");
+                }
             }
+        });
 
-            // максимум 10 символов
-            if (newText.length() > 10) {
-                return null;
-            }
+        // стартовое ограничение
+        datePicker.setValue(virtualToday);
 
-            return change;
-        };
+        // кнопка календаря (по факту просто фокус на пикер)
+        Button calendarBtn = new Button("📅");
+        calendarBtn.setOnAction(e -> datePicker.show());
 
-        dateField.setTextFormatter(new TextFormatter<>(filter));
+        // отображение в текстовом виде (read-only логика)
+        TextField dateDisplay = new TextField();
+        dateDisplay.setEditable(false);
 
-        // автоточки
-        dateField.textProperty().addListener((obs, oldText, newText) -> {
-
-            if (newText.length() == 2 && !newText.contains(".")) {
-                dateField.setText(newText + ".");
-            }
-
-            if (newText.length() == 5 &&
-                    newText.chars().filter(ch -> ch == '.').count() == 1) {
-                dateField.setText(newText + ".");
+        datePicker.valueProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                dateDisplay.setText(newV.format(formatter));
             }
         });
 
@@ -140,7 +138,7 @@ public class MainApp extends Application {
                 descField,
 
                 new LabelStyled("Срок"),
-                dateField,
+                datePicker,
 
                 new LabelStyled("Повтор"),
                 repeatBox,
@@ -167,31 +165,7 @@ public class MainApp extends Application {
 
             String name = nameField.getText().trim();
             String desc = descField.getText().trim();
-            String dateText = dateField.getText().trim();
-
-            if (name.isEmpty() || dateText.length() != 10) {
-
-                showAlert(
-                        "Ошибка",
-                        "Введите название и дату в формате ДД.ММ.ГГГГ"
-                );
-
-                return;
-            }
-
-            LocalDate date;
-
-            try {
-                date = LocalDate.parse(dateText, formatter);
-            } catch (Exception ex) {
-
-                showAlert(
-                        "Ошибка",
-                        "Некорректная дата."
-                );
-
-                return;
-            }
+            LocalDate date = datePicker.getValue();
 
             TaskItem task = new TaskItem(
                     name,
@@ -206,7 +180,7 @@ public class MainApp extends Application {
 
             nameField.clear();
             descField.clear();
-            dateField.clear();
+            dateDisplay.clear();
 
             repeatBox.setValue("Разовая");
         });
