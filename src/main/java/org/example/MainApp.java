@@ -5,6 +5,7 @@ import javafx.collections.FXCollections;
 import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 public class MainApp extends Application {
 
@@ -24,6 +26,9 @@ public class MainApp extends Application {
 
     private final DateTimeFormatter formatter =
             DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+    // ===== ЧИТ ДЛЯ ДЕМОНСТРАЦИИ =====
+    private LocalDate virtualToday = LocalDate.now();
 
     @Override
     public void start(Stage primaryStage) {
@@ -49,8 +54,42 @@ public class MainApp extends Application {
         descField.setPromptText("Описание");
         descField.setPrefRowCount(4);
 
-        DatePicker deadlinePicker = new DatePicker();
-        deadlinePicker.setPromptText("Срок");
+        // ===== DATE FIELD =====
+
+        TextField dateField = new TextField();
+        dateField.setPromptText("ДД.ММ.ГГГГ");
+
+        UnaryOperator<TextFormatter.Change> filter = change -> {
+
+            String newText = change.getControlNewText();
+
+            // только цифры и точки
+            if (!newText.matches("[0-9.]*")) {
+                return null;
+            }
+
+            // максимум 10 символов
+            if (newText.length() > 10) {
+                return null;
+            }
+
+            return change;
+        };
+
+        dateField.setTextFormatter(new TextFormatter<>(filter));
+
+        // автоточки
+        dateField.textProperty().addListener((obs, oldText, newText) -> {
+
+            if (newText.length() == 2 && !newText.contains(".")) {
+                dateField.setText(newText + ".");
+            }
+
+            if (newText.length() == 5 &&
+                    newText.chars().filter(ch -> ch == '.').count() == 1) {
+                dateField.setText(newText + ".");
+            }
+        });
 
         ComboBox<String> repeatBox = new ComboBox<>(
                 FXCollections.observableArrayList(
@@ -60,14 +99,40 @@ public class MainApp extends Application {
                         "Ежемесячно"
                 )
         );
+
         repeatBox.setValue("Разовая");
 
         Button addBtn = createButton("Добавить задачу");
         Button saveBtn = createButton("Сохранить");
         Button loadBtn = createButton("Загрузить");
 
+        // ===== ЧИТ-КНОПКА =====
+
+        Button nextDayBtn = createButton("+ день");
+
+        Label currentDateLabel = new Label(
+                "Сегодня: " + virtualToday.format(formatter)
+        );
+
+        currentDateLabel.setStyle("-fx-text-fill: white;-fx-font-size: 14px;");
+
+        nextDayBtn.setOnAction(e -> {
+
+            virtualToday = virtualToday.plusDays(1);
+
+            currentDateLabel.setText(
+                    "Сегодня: " + virtualToday.format(formatter)
+            );
+
+            updateTasksForNewDay();
+        });
+
         menu.getChildren().addAll(
                 title,
+
+                currentDateLabel,
+                nextDayBtn,
+
                 new LabelStyled("Название"),
                 nameField,
 
@@ -75,7 +140,7 @@ public class MainApp extends Application {
                 descField,
 
                 new LabelStyled("Срок"),
-                deadlinePicker,
+                dateField,
 
                 new LabelStyled("Повтор"),
                 repeatBox,
@@ -102,10 +167,29 @@ public class MainApp extends Application {
 
             String name = nameField.getText().trim();
             String desc = descField.getText().trim();
-            LocalDate date = deadlinePicker.getValue();
+            String dateText = dateField.getText().trim();
 
-            if (name.isEmpty() || date == null) {
-                showAlert("Ошибка", "Введите название и срок.");
+            if (name.isEmpty() || dateText.length() != 10) {
+
+                showAlert(
+                        "Ошибка",
+                        "Введите название и дату в формате ДД.ММ.ГГГГ"
+                );
+
+                return;
+            }
+
+            LocalDate date;
+
+            try {
+                date = LocalDate.parse(dateText, formatter);
+            } catch (Exception ex) {
+
+                showAlert(
+                        "Ошибка",
+                        "Некорректная дата."
+                );
+
                 return;
             }
 
@@ -117,11 +201,13 @@ public class MainApp extends Application {
             );
 
             tasks.add(task);
+
             addTaskCard(task);
 
             nameField.clear();
             descField.clear();
-            deadlinePicker.setValue(null);
+            dateField.clear();
+
             repeatBox.setValue("Разовая");
         });
 
@@ -135,11 +221,42 @@ public class MainApp extends Application {
 
         loadTasks();
 
-        Scene scene = new Scene(root, 1000, 650);
+        Scene scene = new Scene(root, 1050, 700);
 
         primaryStage.setTitle("Список задач");
         primaryStage.setScene(scene);
         primaryStage.show();
+    }
+
+    // ===== ОБНОВЛЕНИЕ НОВОГО ДНЯ =====
+
+    private void updateTasksForNewDay() {
+
+        for (TaskItem task : tasks) {
+
+            // сброс выполненности у циклических задач
+            if (!task.repeatType.equals("Разовая")) {
+
+                if (task.completed &&
+                        virtualToday.isAfter(task.lastCompletedDate)) {
+
+                    task.completed = false;
+                }
+            }
+        }
+
+        redrawTasks();
+    }
+
+    // ===== ПЕРЕРИСОВКА =====
+
+    private void redrawTasks() {
+
+        tasksContainer.getChildren().clear();
+
+        for (TaskItem task : tasks) {
+            addTaskCard(task);
+        }
     }
 
     // ===== TASK CARD =====
@@ -177,6 +294,20 @@ public class MainApp extends Application {
             status.setTextFill(Color.DARKRED);
         }
 
+        Label lastCompletedLabel = new Label();
+
+        if (task.lastCompletedDate != null) {
+
+            lastCompletedLabel.setText(
+                    "Последнее выполнение: "
+                            + task.lastCompletedDate.format(formatter)
+            );
+
+            lastCompletedLabel.setStyle(
+                    "-fx-text-fill: #2980b9;"
+            );
+        }
+
         Button doneBtn = createSmallButton("Выполнено");
         Button editDeadlineBtn = createSmallButton("Изменить срок");
         Button deleteBtn = createSmallButton("Удалить");
@@ -194,15 +325,25 @@ public class MainApp extends Application {
         doneBtn.setOnAction(e -> {
 
             if (task.completed) {
-                showAlert("Информация", "Задача уже выполнена.");
+
+                showAlert(
+                        "Информация",
+                        "Задача уже выполнена сегодня."
+                );
+
                 return;
             }
 
-            if (LocalDate.now().isAfter(task.deadline)) {
+            if (virtualToday.isAfter(task.deadline)) {
 
                 TextInputDialog dialog = new TextInputDialog();
+
                 dialog.setTitle("Комментарий");
-                dialog.setHeaderText("Задача выполнена не в срок");
+
+                dialog.setHeaderText(
+                        "Задача выполнена не в срок"
+                );
+
                 dialog.setContentText("Введите причину:");
 
                 dialog.showAndWait().ifPresent(comment -> {
@@ -211,20 +352,26 @@ public class MainApp extends Application {
             }
 
             task.completed = true;
+            task.lastCompletedDate = virtualToday;
 
-            status.setText("Статус: выполнено");
-            status.setTextFill(Color.GREEN);
+            // ===== ЦИКЛИЧЕСКИЕ ЗАДАЧИ =====
 
-            if (!task.comment.isEmpty()) {
-                Label commentLabel =
-                        new Label("Комментарий: " + task.comment);
+            if (!task.repeatType.equals("Разовая")) {
 
-                commentLabel.setStyle("-fx-text-fill: #7f8c8d;-fx-font-style: italic;");
+                switch (task.repeatType) {
 
-                if (!card.getChildren().contains(commentLabel)) {
-                    card.getChildren().add(commentLabel);
+                    case "Ежедневно":
+                            task.deadline = task.deadline.plusDays(1);
+
+                    case "Еженедельно":
+                            task.deadline = task.deadline.plusWeeks(1);
+
+                    case "Ежемесячно":
+                            task.deadline = task.deadline.plusMonths(1);
                 }
             }
+
+            redrawTasks();
         });
 
         // ===== CHANGE DEADLINE =====
@@ -234,13 +381,16 @@ public class MainApp extends Application {
             Dialog<LocalDate> dialog = new Dialog<>();
             dialog.setTitle("Изменение срока");
 
-            DatePicker picker = new DatePicker(task.deadline);
+            TextField newDateField = new TextField(
+                    task.deadline.format(formatter)
+            );
+
             TextArea reasonArea = new TextArea();
             reasonArea.setPromptText("Причина изменения срока");
 
             VBox content = new VBox(10,
                     new Label("Новый срок"),
-                    picker,
+                    newDateField,
                     new Label("Причина"),
                     reasonArea
             );
@@ -257,53 +407,48 @@ public class MainApp extends Application {
             );
 
             dialog.setResultConverter(btn -> {
-                if (btn == ok) return picker.getValue();
+
+                if (btn == ok) {
+
+                    try {
+                        return LocalDate.parse(
+                                newDateField.getText(),
+                                formatter
+                        );
+                    } catch (Exception ex) {
+                        return null;
+                    }
+                }
+
                 return null;
             });
 
             dialog.showAndWait().ifPresent(newDate -> {
 
                 if (reasonArea.getText().trim().isEmpty()) {
-                    showAlert("Ошибка",
-                            "Нужно указать причину изменения срока.");
+
+                    showAlert(
+                            "Ошибка",
+                            "Нужно указать причину изменения срока."
+                    );
+
                     return;
                 }
 
                 task.deadline = newDate;
                 task.changeReason = reasonArea.getText();
 
-                deadline.setText(
-                        "Срок: " + task.deadline.format(formatter)
-                );
-
-                Label reasonLabel =
-                        new Label("Причина переноса: "
-                                + task.changeReason);
-
-                reasonLabel.setStyle("-fx-text-fill: #8e44ad;-fx-font-style: italic;");
-
-                boolean exists = false;
-
-                for (var node : card.getChildren()) {
-                    if (node instanceof Label &&
-                            ((Label) node).getText().startsWith("Причина переноса")) {
-                        Label l = (Label) node;
-                        l.setText(reasonLabel.getText());
-                        exists = true;
-                    }
-                }
-
-                if (!exists) {
-                    card.getChildren().add(reasonLabel);
-                }
+                redrawTasks();
             });
         });
 
         // ===== DELETE =====
 
         deleteBtn.setOnAction(e -> {
+
             tasks.remove(task);
-            tasksContainer.getChildren().remove(card);
+
+            redrawTasks();
         });
 
         card.getChildren().addAll(
@@ -311,9 +456,39 @@ public class MainApp extends Application {
                 desc,
                 deadline,
                 repeat,
-                status,
-                controls
+                status
         );
+
+        if (!lastCompletedLabel.getText().isEmpty()) {
+            card.getChildren().add(lastCompletedLabel);
+        }
+
+        if (!task.comment.isEmpty()) {
+
+            Label commentLabel =
+                    new Label("Комментарий: " + task.comment);
+
+            commentLabel.setStyle(
+                    "-fx-text-fill: #7f8c8d;-fx-font-style: italic;"
+            );
+
+            card.getChildren().add(commentLabel);
+        }
+
+        if (!task.changeReason.isEmpty()) {
+
+            Label reasonLabel =
+                    new Label("Причина переноса: "
+                            + task.changeReason);
+
+            reasonLabel.setStyle(
+                    "-fx-text-fill: #8e44ad;-fx-font-style: italic;"
+            );
+
+            card.getChildren().add(reasonLabel);
+        }
+
+        card.getChildren().add(controls);
 
         tasksContainer.getChildren().add(card);
     }
@@ -334,16 +509,24 @@ public class MainApp extends Application {
                                 t.repeatType + ";;" +
                                 t.completed + ";;" +
                                 t.comment + ";;" +
-                                t.changeReason
+                                t.changeReason + ";;" +
+                                (t.lastCompletedDate == null
+                                        ? "null"
+                                        : t.lastCompletedDate)
                 );
             }
 
-            showAlert("Успех",
-                    "Задачи сохранены в файл.");
+            showAlert(
+                    "Успех",
+                    "Задачи сохранены в файл."
+            );
 
         } catch (IOException e) {
-            showAlert("Ошибка",
-                    "Не удалось сохранить файл.");
+
+            showAlert(
+                    "Ошибка",
+                    "Не удалось сохранить файл."
+            );
         }
     }
 
@@ -362,7 +545,7 @@ public class MainApp extends Application {
 
                 String[] parts = line.split(";;");
 
-                if (parts.length < 7) continue;
+                if (parts.length < 8) continue;
 
                 TaskItem task = new TaskItem(
                         parts[0],
@@ -377,13 +560,22 @@ public class MainApp extends Application {
                 task.comment = parts[5];
                 task.changeReason = parts[6];
 
+                if (!parts[7].equals("null")) {
+                    task.lastCompletedDate =
+                            LocalDate.parse(parts[7]);
+                }
+
                 tasks.add(task);
-                addTaskCard(task);
             }
 
+            redrawTasks();
+
         } catch (IOException e) {
-            showAlert("Ошибка",
-                    "Не удалось загрузить файл.");
+
+            showAlert(
+                    "Ошибка",
+                    "Не удалось загрузить файл."
+            );
         }
     }
 
@@ -427,6 +619,7 @@ public class MainApp extends Application {
     private static class LabelStyled extends Label {
 
         LabelStyled(String text) {
+
             super(text);
 
             setStyle("-fx-text-fill: white;-fx-font-weight: bold;");
@@ -439,13 +632,18 @@ public class MainApp extends Application {
 
         String title;
         String description;
+
         LocalDate deadline;
+
         String repeatType;
 
         boolean completed = false;
 
         String comment = "";
+
         String changeReason = "";
+
+        LocalDate lastCompletedDate = null;
 
         TaskItem(String title,
                  String description,
