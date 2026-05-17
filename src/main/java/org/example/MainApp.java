@@ -237,25 +237,36 @@ public class MainApp extends Application {
             if (!task.repeatType.equals("Разовая")) {
 
                 if (task.completed &&
-                        task.lastCompletedDate != null &&
-                        virtualToday.isAfter(task.lastCompletedDate)) {
+                        virtualToday.isAfter(task.deadline)) {
 
-                    // сброс выполненности
+                    // сбрасываем выполненность
                     task.completed = false;
 
-                    // перенос дедлайна
+                    // двигаем дедлайн вперед
                     switch (task.repeatType) {
 
                         case "Ежедневно":
-                            task.deadline = task.deadline.plusDays(1);
+
+                            while (task.deadline.isBefore(virtualToday)) {
+                                task.deadline = task.deadline.plusDays(1);
+                            }
+
                             break;
 
                         case "Еженедельно":
-                            task.deadline = task.deadline.plusWeeks(1);
+
+                            while (task.deadline.isBefore(virtualToday)) {
+                                task.deadline = task.deadline.plusWeeks(1);
+                            }
+
                             break;
 
                         case "Ежемесячно":
-                            task.deadline = task.deadline.plusMonths(1);
+
+                            while (task.deadline.isBefore(virtualToday)) {
+                                task.deadline = task.deadline.plusMonths(1);
+                            }
+
                             break;
                     }
                 }
