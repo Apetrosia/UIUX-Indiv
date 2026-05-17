@@ -234,13 +234,30 @@ public class MainApp extends Application {
 
         for (TaskItem task : tasks) {
 
-            // сброс выполненности у циклических задач
             if (!task.repeatType.equals("Разовая")) {
 
                 if (task.completed &&
+                        task.lastCompletedDate != null &&
                         virtualToday.isAfter(task.lastCompletedDate)) {
 
+                    // сброс выполненности
                     task.completed = false;
+
+                    // перенос дедлайна
+                    switch (task.repeatType) {
+
+                        case "Ежедневно":
+                            task.deadline = task.deadline.plusDays(1);
+                            break;
+
+                        case "Еженедельно":
+                            task.deadline = task.deadline.plusWeeks(1);
+                            break;
+
+                        case "Ежемесячно":
+                            task.deadline = task.deadline.plusMonths(1);
+                            break;
+                    }
                 }
             }
         }
@@ -355,21 +372,6 @@ public class MainApp extends Application {
             task.lastCompletedDate = virtualToday;
 
             // ===== ЦИКЛИЧЕСКИЕ ЗАДАЧИ =====
-
-            if (!task.repeatType.equals("Разовая")) {
-
-                switch (task.repeatType) {
-
-                    case "Ежедневно":
-                            task.deadline = task.deadline.plusDays(1);
-
-                    case "Еженедельно":
-                            task.deadline = task.deadline.plusWeeks(1);
-
-                    case "Ежемесячно":
-                            task.deadline = task.deadline.plusMonths(1);
-                }
-            }
 
             redrawTasks();
         });
