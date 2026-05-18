@@ -53,6 +53,10 @@ public class MainApp extends Application {
         datePicker.setValue(virtualToday);
         datePicker.setPromptText("Дата");
 
+        // запрет ручного редактирования текста
+        datePicker.getEditor().setDisable(true);
+        datePicker.getEditor().setOpacity(1);
+
         // запрет прошлых дат
         datePicker.setDayCellFactory(picker -> new DateCell() {
             @Override
@@ -85,8 +89,21 @@ public class MainApp extends Application {
         currentDateLabel.setStyle("-fx-text-fill: white;-fx-font-size: 14px;");
 
         nextDayBtn.setOnAction(e -> {
+
             virtualToday = virtualToday.plusDays(1);
-            currentDateLabel.setText("Сегодня: " + virtualToday.format(formatter));
+
+            currentDateLabel.setText(
+                    "Сегодня: " + virtualToday.format(formatter)
+            );
+
+            // если дата в DatePicker уже прошла —
+            // автоматически ставим текущую дату
+            if (datePicker.getValue() == null ||
+                    datePicker.getValue().isBefore(virtualToday)) {
+
+                datePicker.setValue(virtualToday);
+            }
+
             updateTasksForNewDay();
         });
 
@@ -157,7 +174,7 @@ public class MainApp extends Application {
 
         loadTasks();
 
-        Scene scene = new Scene(root, 1050, 700);
+        Scene scene = new Scene(root, 1000, 600);
         primaryStage.setScene(scene);
         primaryStage.setTitle("Список задач");
         primaryStage.show();
