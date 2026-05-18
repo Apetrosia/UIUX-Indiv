@@ -176,8 +176,7 @@ public class MainApp extends Application {
                 loadBtn
         );
 
-        ScrollPane scroll =
-                new ScrollPane(tasksContainer);
+        ScrollPane scroll = new ScrollPane(tasksContainer);
 
         scroll.setFitToWidth(true);
 
