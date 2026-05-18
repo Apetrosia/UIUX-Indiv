@@ -11,6 +11,7 @@ import javafx.stage.Stage;
 
 import java.io.*;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,7 @@ public class MainApp extends Application {
         BorderPane root = new BorderPane();
 
         VBox menu = new VBox(12);
+
         menu.setPadding(new Insets(15));
         menu.setPrefWidth(280);
         menu.setAlignment(Pos.TOP_CENTER);
@@ -61,21 +63,22 @@ public class MainApp extends Application {
         DatePicker datePicker = new DatePicker();
 
         datePicker.setValue(virtualToday);
-        datePicker.setPromptText("Дата");
 
-        // запрет ручного ввода
         datePicker.getEditor().setDisable(true);
         datePicker.getEditor().setOpacity(1);
 
-        // запрет прошлых дат
         datePicker.setDayCellFactory(picker -> new DateCell() {
 
             @Override
-            public void updateItem(LocalDate date, boolean empty) {
+            public void updateItem(LocalDate date,
+                                   boolean empty) {
 
                 super.updateItem(date, empty);
 
-                setDisable(empty || date.isBefore(virtualToday));
+                setDisable(
+                        empty ||
+                                date.isBefore(virtualToday)
+                );
             }
         });
 
@@ -90,14 +93,21 @@ public class MainApp extends Application {
 
         repeatBox.setValue("Разовая");
 
-        Button addBtn = createButton("Добавить задачу");
-        Button saveBtn = createButton("Сохранить");
-        Button loadBtn = createButton("Загрузить");
+        Button addBtn =
+                createButton("Добавить задачу");
 
-        Button nextDayBtn = createButton("+ день");
+        Button saveBtn =
+                createButton("Сохранить");
+
+        Button loadBtn =
+                createButton("Загрузить");
+
+        Button nextDayBtn =
+                createButton("+ день");
 
         Label currentDateLabel = new Label(
-                "Сегодня: " + virtualToday.format(formatter)
+                "Сегодня: "
+                        + virtualToday.format(formatter)
         );
 
         currentDateLabel.setStyle(
@@ -109,29 +119,35 @@ public class MainApp extends Application {
 
         nextDayBtn.setOnAction(e -> {
 
-            virtualToday = virtualToday.plusDays(1);
+            virtualToday =
+                    virtualToday.plusDays(1);
 
             currentDateLabel.setText(
-                    "Сегодня: " + virtualToday.format(formatter)
+                    "Сегодня: "
+                            + virtualToday.format(formatter)
             );
 
-            // если дата стала прошлой —
-            // автоматически обновляем
+            // если дата стала прошлой
             if (datePicker.getValue() == null ||
-                    datePicker.getValue().isBefore(virtualToday)) {
+                    datePicker.getValue()
+                            .isBefore(virtualToday)) {
 
                 datePicker.setValue(virtualToday);
             }
 
-            // обновляем ограничения календаря
+            // обновляем ограничения
             datePicker.setDayCellFactory(picker -> new DateCell() {
 
                 @Override
-                public void updateItem(LocalDate date, boolean empty) {
+                public void updateItem(LocalDate date,
+                                       boolean empty) {
 
                     super.updateItem(date, empty);
 
-                    setDisable(empty || date.isBefore(virtualToday));
+                    setDisable(
+                            empty ||
+                                    date.isBefore(virtualToday)
+                    );
                 }
             });
 
@@ -160,11 +176,14 @@ public class MainApp extends Application {
                 loadBtn
         );
 
-        ScrollPane scroll = new ScrollPane(tasksContainer);
+        ScrollPane scroll =
+                new ScrollPane(tasksContainer);
 
         scroll.setFitToWidth(true);
 
-        tasksContainer.setPadding(new Insets(15));
+        tasksContainer.setPadding(
+                new Insets(15)
+        );
 
         tasksContainer.setStyle(
                 "-fx-background-color: #ecf0f1;"
@@ -177,9 +196,14 @@ public class MainApp extends Application {
 
         addBtn.setOnAction(e -> {
 
-            String name = nameField.getText().trim();
-            String desc = descField.getText().trim();
-            LocalDate date = datePicker.getValue();
+            String name =
+                    nameField.getText().trim();
+
+            String desc =
+                    descField.getText().trim();
+
+            LocalDate date =
+                    datePicker.getValue();
 
             if (name.isEmpty() ||
                     desc.isEmpty() ||
@@ -187,7 +211,7 @@ public class MainApp extends Application {
 
                 showAlert(
                         "Ошибка",
-                        "Заполните название, описание и дату"
+                        "Заполните все поля."
                 );
 
                 return;
@@ -197,22 +221,23 @@ public class MainApp extends Application {
 
                 showAlert(
                         "Ошибка",
-                        "Дата не может быть раньше сегодняшней"
+                        "Дата раньше сегодняшней."
                 );
 
                 return;
             }
 
-            TaskItem task = new TaskItem(
-                    name,
-                    desc,
-                    date,
-                    repeatBox.getValue()
-            );
+            TaskItem task =
+                    new TaskItem(
+                            name,
+                            desc,
+                            date,
+                            repeatBox.getValue()
+                    );
 
             tasks.add(task);
 
-            addTaskCard(task);
+            redrawTasks();
 
             nameField.clear();
             descField.clear();
@@ -222,11 +247,7 @@ public class MainApp extends Application {
             repeatBox.setValue("Разовая");
         });
 
-        // ===== SAVE =====
-
         saveBtn.setOnAction(e -> saveTasks());
-
-        // ===== LOAD =====
 
         loadBtn.setOnAction(e -> {
 
@@ -239,7 +260,8 @@ public class MainApp extends Application {
 
         loadTasks();
 
-        Scene scene = new Scene(root, 900, 560);
+        Scene scene =
+                new Scene(root, 900, 560);
 
         primaryStage.setScene(scene);
 
@@ -263,30 +285,37 @@ public class MainApp extends Application {
                         "-fx-border-color: #dcdde1;"
         );
 
-        Label name = new Label(task.title);
+        Label name =
+                new Label(task.title);
 
         name.setStyle(
                 "-fx-font-size: 18px;" +
                         "-fx-font-weight: bold;"
         );
 
-        Label desc = new Label(task.description);
+        Label desc =
+                new Label(task.description);
 
         desc.setWrapText(true);
 
-        Label deadline = new Label(
-                "Срок: " + task.deadline.format(formatter)
-        );
+        Label deadline =
+                new Label(
+                        "Срок: "
+                                + task.deadline.format(formatter)
+                );
 
-        Label repeat = new Label(
-                "Тип: " + task.repeatType
-        );
+        Label repeat =
+                new Label(
+                        "Тип: "
+                                + task.repeatType
+                );
 
-        Label status = new Label(
-                task.completed
-                        ? "Статус: выполнено"
-                        : "Статус: не выполнено"
-        );
+        Label status =
+                new Label(
+                        task.completed
+                                ? "Статус: выполнено"
+                                : "Статус: не выполнено"
+                );
 
         status.setTextFill(
                 task.completed
@@ -303,14 +332,13 @@ public class MainApp extends Application {
         Button deleteBtn =
                 createSmallButton("Удалить");
 
-        HBox controls = new HBox(
-                10,
-                doneBtn,
-                editDeadlineBtn,
-                deleteBtn
-        );
-
-        controls.setAlignment(Pos.CENTER_LEFT);
+        HBox controls =
+                new HBox(
+                        10,
+                        doneBtn,
+                        editDeadlineBtn,
+                        deleteBtn
+                );
 
         // ===== COMPLETE =====
 
@@ -326,7 +354,7 @@ public class MainApp extends Application {
                 return;
             }
 
-            // просрочена?
+            // просрочка
             if (virtualToday.isAfter(task.deadline)) {
 
                 TextInputDialog dialog =
@@ -342,9 +370,10 @@ public class MainApp extends Application {
                         "Введите причину:"
                 );
 
-                dialog.showAndWait().ifPresent(comment -> {
-                    task.comment = comment;
-                });
+                dialog.showAndWait()
+                        .ifPresent(comment ->
+                                task.comment = comment
+                        );
             }
 
             task.completed = true;
@@ -359,28 +388,15 @@ public class MainApp extends Application {
             Dialog<LocalDate> dialog =
                     new Dialog<>();
 
-            dialog.setTitle("Изменение срока");
+            dialog.setTitle(
+                    "Изменение срока"
+            );
 
             DatePicker picker =
                     new DatePicker(task.deadline);
 
             picker.getEditor().setDisable(true);
             picker.getEditor().setOpacity(1);
-
-            picker.setDayCellFactory(dp -> new DateCell() {
-
-                @Override
-                public void updateItem(LocalDate date,
-                                       boolean empty) {
-
-                    super.updateItem(date, empty);
-
-                    setDisable(
-                            empty ||
-                                    date.isBefore(virtualToday)
-                    );
-                }
-            });
 
             TextArea reasonArea =
                     new TextArea();
@@ -389,15 +405,17 @@ public class MainApp extends Application {
                     "Причина изменения срока"
             );
 
-            VBox content = new VBox(
-                    10,
-                    new Label("Новый срок"),
-                    picker,
-                    new Label("Причина"),
-                    reasonArea
-            );
+            VBox content =
+                    new VBox(
+                            10,
+                            new Label("Новый срок"),
+                            picker,
+                            new Label("Причина"),
+                            reasonArea
+                    );
 
-            dialog.getDialogPane().setContent(content);
+            dialog.getDialogPane()
+                    .setContent(content);
 
             ButtonType ok =
                     new ButtonType(
@@ -418,27 +436,35 @@ public class MainApp extends Application {
                 return null;
             });
 
-            dialog.showAndWait().ifPresent(newDate -> {
+            dialog.showAndWait()
+                    .ifPresent(newDate -> {
 
-                if (reasonArea.getText()
-                        .trim()
-                        .isEmpty()) {
+                        if (reasonArea.getText()
+                                .trim()
+                                .isEmpty()) {
 
-                    showAlert(
-                            "Ошибка",
-                            "Нужно указать причину изменения срока."
-                    );
+                            showAlert(
+                                    "Ошибка",
+                                    "Введите причину изменения."
+                            );
 
-                    return;
-                }
+                            return;
+                        }
 
-                task.deadline = newDate;
+                        task.deadline = newDate;
 
-                task.changeReason =
-                        reasonArea.getText();
+                        task.changeReason =
+                                reasonArea.getText();
 
-                redrawTasks();
-            });
+                        // обновляем день месяца
+                        if (task.repeatType.equals("Ежемесячно")) {
+
+                            task.monthlyDay =
+                                    newDate.getDayOfMonth();
+                        }
+
+                        redrawTasks();
+                    });
         });
 
         // ===== DELETE =====
@@ -459,38 +485,124 @@ public class MainApp extends Application {
                 controls
         );
 
-        // комментарий о просрочке
+        // комментарий
         if (!task.comment.isEmpty()) {
 
-            Label commentLabel = new Label(
-                    "Комментарий: " + task.comment
-            );
+            Label commentLabel =
+                    new Label(
+                            "Комментарий: "
+                                    + task.comment
+                    );
 
             commentLabel.setStyle(
                     "-fx-text-fill: #7f8c8d;" +
                             "-fx-font-style: italic;"
             );
 
-            card.getChildren().add(commentLabel);
+            card.getChildren()
+                    .add(commentLabel);
         }
 
         // причина переноса
         if (!task.changeReason.isEmpty()) {
 
-            Label reasonLabel = new Label(
-                    "Причина переноса: "
-                            + task.changeReason
-            );
+            Label reasonLabel =
+                    new Label(
+                            "Причина переноса: "
+                                    + task.changeReason
+                    );
 
             reasonLabel.setStyle(
                     "-fx-text-fill: #8e44ad;" +
                             "-fx-font-style: italic;"
             );
 
-            card.getChildren().add(reasonLabel);
+            card.getChildren()
+                    .add(reasonLabel);
         }
 
         tasksContainer.getChildren().add(card);
+    }
+
+    // ===== UPDATE DAY =====
+
+    private void updateTasksForNewDay() {
+
+        for (TaskItem task : tasks) {
+
+            if (!task.completed) {
+                continue;
+            }
+
+            if (task.deadline.isBefore(virtualToday)) {
+
+                switch (task.repeatType) {
+
+                    case "Ежедневно":
+
+                        while (task.deadline
+                                .isBefore(virtualToday)) {
+
+                            task.deadline =
+                                    task.deadline.plusDays(1);
+                        }
+
+                        task.completed = false;
+
+                        break;
+
+                    case "Еженедельно":
+
+                        while (task.deadline
+                                .isBefore(virtualToday)) {
+
+                            task.deadline =
+                                    task.deadline.plusWeeks(1);
+                        }
+
+                        task.completed = false;
+
+                        break;
+
+                    case "Ежемесячно":
+
+                        while (task.deadline
+                                .isBefore(virtualToday)) {
+
+                            LocalDate next =
+                                    task.deadline.plusMonths(1);
+
+                            YearMonth ym =
+                                    YearMonth.of(
+                                            next.getYear(),
+                                            next.getMonth()
+                                    );
+
+                            int maxDay =
+                                    ym.lengthOfMonth();
+
+                            int targetDay =
+                                    Math.min(
+                                            task.monthlyDay,
+                                            maxDay
+                                    );
+
+                            task.deadline =
+                                    LocalDate.of(
+                                            next.getYear(),
+                                            next.getMonth(),
+                                            targetDay
+                                    );
+                        }
+
+                        task.completed = false;
+
+                        break;
+                }
+            }
+        }
+
+        redrawTasks();
     }
 
     // ===== REFRESH =====
@@ -523,20 +635,21 @@ public class MainApp extends Application {
                                 t.repeatType + ";;" +
                                 t.completed + ";;" +
                                 t.comment + ";;" +
-                                t.changeReason
+                                t.changeReason + ";;" +
+                                t.monthlyDay
                 );
             }
 
             showAlert(
                     "Успех",
-                    "Задачи сохранены."
+                    "Сохранено."
             );
 
         } catch (IOException e) {
 
             showAlert(
                     "Ошибка",
-                    "Не удалось сохранить файл."
+                    "Ошибка сохранения."
             );
         }
     }
@@ -561,7 +674,7 @@ public class MainApp extends Application {
                 String[] parts =
                         line.split(";;");
 
-                if (parts.length < 7) {
+                if (parts.length < 8) {
                     continue;
                 }
 
@@ -576,9 +689,14 @@ public class MainApp extends Application {
                 task.completed =
                         Boolean.parseBoolean(parts[4]);
 
-                task.comment = parts[5];
+                task.comment =
+                        parts[5];
 
-                task.changeReason = parts[6];
+                task.changeReason =
+                        parts[6];
+
+                task.monthlyDay =
+                        Integer.parseInt(parts[7]);
 
                 tasks.add(task);
             }
@@ -589,16 +707,9 @@ public class MainApp extends Application {
 
             showAlert(
                     "Ошибка",
-                    "Не удалось загрузить файл."
+                    "Ошибка загрузки."
             );
         }
-    }
-
-    // ===== UPDATE DAY =====
-
-    private void updateTasksForNewDay() {
-
-        redrawTasks();
     }
 
     // ===== BUTTONS =====
@@ -664,6 +775,9 @@ public class MainApp extends Application {
         String comment = "";
         String changeReason = "";
 
+        // для ежемесячных задач
+        int monthlyDay;
+
         TaskItem(String title,
                  String description,
                  LocalDate deadline,
@@ -673,6 +787,9 @@ public class MainApp extends Application {
             this.description = description;
             this.deadline = deadline;
             this.repeatType = repeatType;
+
+            this.monthlyDay =
+                    deadline.getDayOfMonth();
         }
     }
 
