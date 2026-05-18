@@ -357,8 +357,8 @@ public class MainApp extends Application {
             // просрочка
             if (virtualToday.isAfter(task.deadline)) {
 
-                TextInputDialog dialog =
-                        new TextInputDialog();
+                Dialog<String> dialog =
+                        new Dialog<>();
 
                 dialog.setTitle("Комментарий");
 
@@ -366,14 +366,75 @@ public class MainApp extends Application {
                         "Задача выполнена не в срок"
                 );
 
-                dialog.setContentText(
-                        "Введите причину:"
+                TextArea commentArea =
+                        new TextArea();
+
+                commentArea.setPromptText(
+                        "Введите причину"
                 );
 
-                dialog.showAndWait()
-                        .ifPresent(comment ->
-                                task.comment = comment
+                ButtonType okButton =
+                        new ButtonType(
+                                "OK",
+                                ButtonBar.ButtonData.OK_DONE
                         );
+
+                ButtonType cancelButton =
+                        new ButtonType(
+                                "Отмена",
+                                ButtonBar.ButtonData.CANCEL_CLOSE
+                        );
+
+                dialog.getDialogPane()
+                        .getButtonTypes()
+                        .addAll(okButton, cancelButton);
+
+                dialog.getDialogPane()
+                        .setContent(commentArea);
+
+                Button ok =
+                        (Button) dialog.getDialogPane()
+                                .lookupButton(okButton);
+
+                // вручную обрабатываем OK
+                ok.addEventFilter(
+                        javafx.event.ActionEvent.ACTION,
+                        event -> {
+
+                            if (commentArea.getText()
+                                    .trim()
+                                    .isEmpty()) {
+
+                                showAlert(
+                                        "Ошибка",
+                                        "Комментарий не может быть пустым."
+                                );
+
+                                // НЕ закрываем окно
+                                event.consume();
+                            }
+                        }
+                );
+
+                dialog.setResultConverter(button -> {
+
+                    if (button == okButton) {
+
+                        return commentArea.getText()
+                                .trim();
+                    }
+
+                    return null;
+                });
+
+                var result = dialog.showAndWait();
+
+                // крестик или отмена
+                if (result.isEmpty()) {
+                    return;
+                }
+
+                task.comment = result.get();
             }
 
             task.completed = true;
@@ -423,9 +484,39 @@ public class MainApp extends Application {
                             ButtonBar.ButtonData.OK_DONE
                     );
 
+            ButtonType cancel =
+                    new ButtonType(
+                            "Отмена",
+                            ButtonBar.ButtonData.CANCEL_CLOSE
+                    );
+
             dialog.getDialogPane()
                     .getButtonTypes()
-                    .addAll(ok, ButtonType.CANCEL);
+                    .addAll(ok, cancel);
+
+            Button okButton =
+                    (Button) dialog.getDialogPane()
+                            .lookupButton(ok);
+
+            // вручную валидируем ввод
+            okButton.addEventFilter(
+                    javafx.event.ActionEvent.ACTION,
+                    event -> {
+
+                        if (reasonArea.getText()
+                                .trim()
+                                .isEmpty()) {
+
+                            showAlert(
+                                    "Ошибка",
+                                    "Причина изменения не может быть пустой."
+                            );
+
+                            // окно НЕ закрывается
+                            event.consume();
+                        }
+                    }
+            );
 
             dialog.setResultConverter(btn -> {
 
@@ -436,35 +527,28 @@ public class MainApp extends Application {
                 return null;
             });
 
-            dialog.showAndWait()
-                    .ifPresent(newDate -> {
+            var result = dialog.showAndWait();
 
-                        if (reasonArea.getText()
-                                .trim()
-                                .isEmpty()) {
+            // крестик или отмена
+            if (result.isEmpty()) {
+                return;
+            }
 
-                            showAlert(
-                                    "Ошибка",
-                                    "Введите причину изменения."
-                            );
+            LocalDate newDate = result.get();
 
-                            return;
-                        }
+            task.deadline = newDate;
 
-                        task.deadline = newDate;
+            task.changeReason =
+                    reasonArea.getText().trim();
 
-                        task.changeReason =
-                                reasonArea.getText();
+            // ежемесячные задачи
+            if (task.repeatType.equals("Ежемесячно")) {
 
-                        // обновляем день месяца
-                        if (task.repeatType.equals("Ежемесячно")) {
+                task.monthlyDay =
+                        newDate.getDayOfMonth();
+            }
 
-                            task.monthlyDay =
-                                    newDate.getDayOfMonth();
-                        }
-
-                        redrawTasks();
-                    });
+            redrawTasks();
         });
 
         // ===== DELETE =====
